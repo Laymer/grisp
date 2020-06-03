@@ -55,22 +55,36 @@ init(Slot = uart) ->
     Port = open_port({spawn_driver, "grisp_termios_drv"}, [binary]),
     grisp_devices:register(Slot, ?MODULE),
     grisp_gpio:configure(uart_2_txd, output_0),
-    {ok, #state{port = Port, txd_pin_state = output_0}}.
+    {ok, #state{
+        port = Port
+        , txd_pin_state = output_0
+        , last_val = undefined}}.
 
 % @private
 handle_call(get_value, _From, #state{last_val = Val} = State) ->
     {reply, Val, State};
 % @private
-handle_call(get_single_value, _From, #state{txd_pin_state = Txd} = State) ->
-    Val = case Txd of
-        output_0 ->
+handle_call(get_single_value, _From, #state{last_val = Val, txd_pin_state = Txd} = State) ->
+    Single = case Txd =:= output_0 of
+        true -> %% first measurement
             grisp_gpio:configure(uart_2_txd, output_1),
-            erlang:send_after(100, ?MODULE, get_single_value);
-        output_1 ->
-            pmod_maxsonar:get(),
-            grisp_gpio:configure(uart_2_txd, output_0)
+            timer:sleep(50),
+            pmod_maxsonar:get();
+        _ ->
+            case Val =:= undefined of
+                true ->
+                    grisp_gpio:configure(uart_2_txd, output_1),
+                    timer:sleep(50),
+                    pmod_maxsonar:get();
+                false ->
+                    pmod_maxsonar:get()
+            end
     end,
-    {reply, Val, {noreply, State#state{txd_pin_state = output_0}, 5000}}.
+    grisp_gpio:configure(uart_2_txd, output_0),
+    {reply
+        , Single
+        , State#state{last_val = Single, txd_pin_state = output_0}
+        , 5000}.
 
 % @private
 handle_cast(Request, _State) -> error({unknown_cast, Request}).
