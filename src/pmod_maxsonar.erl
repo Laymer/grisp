@@ -77,7 +77,7 @@ handle_call(get_single_value, _From, #state{last_val = Val, txd_pin_state = Txd}
                     timer:sleep(50),
                     pmod_maxsonar:get();
                 false ->
-                    pmod_maxsonar:get()
+                    Val
             end
     end,
     grisp_gpio:configure(uart_2_txd, output_0),
