@@ -61,7 +61,7 @@ init(Slot = uart) ->
 handle_call(get_value, _From, #state{last_val = Val} = State) ->
     {reply, Val, State};
 % @private
-handle_call(get_single_value, _From, State#state{txd_pin_state = Txd}) ->
+handle_call(get_single_value, _From, #state{txd_pin_state = Txd} = State) ->
     Val = case Txd of
         output_0 ->
             grisp_gpio:configure(uart_2_txd, output_1),
@@ -70,7 +70,7 @@ handle_call(get_single_value, _From, State#state{txd_pin_state = Txd}) ->
             pmod_maxsonar:get(),
             grisp_gpio:configure(uart_2_txd, output_0)
     end,
-    {reply, Val, {noreply, State#state{txd_pin_state = output_0}, 5000}.
+    {reply, Val, {noreply, State#state{txd_pin_state = output_0}, 5000}}.
 
 % @private
 handle_cast(Request, _State) -> error({unknown_cast, Request}).
