@@ -29,6 +29,8 @@
 -export([clear/1]).
 -export([set/1]).
 
+-export([set_mode/1]).
+
 % Callbacks
 -export([init/1]).
 -export([handle_call/3]).
@@ -124,6 +126,16 @@ init(DriverMod) ->
     {ok, #state{driver = {DriverMod, Ref}}}.
 
 % @private
+handle_call(clear_txd, _From, State) ->
+    grisp_gpio:configure(uart_2_txd, output_0),
+    Txd = grisp_gpio:get(uart_2_txd),
+    {reply, Txd, State};
+% @private
+handle_call(set_txd, _From, State) ->
+    grisp_gpio:configure(uart_2_txd, output_1),
+    Txd = grisp_gpio:get(uart_2_txd),
+    {reply, Txd, State};
+% @private
 handle_call({command, Command}, _From, State) ->
     {DriverMod, Ref} = State#state.driver,
     Result = DriverMod:command(Ref, Command),
@@ -188,3 +200,10 @@ map_attr([default]) -> 0.
 bool(<<0>>) -> false;
 bool(<<1>>) -> true;
 bool(Val)   -> Val.
+
+set_mode(disabled) ->
+    gen_server:call(?MODULE, clear_txd);
+set_mode(single) -> 
+    gen_server:call(?MODULE, set_txd).
+
+% set_mode(continuous) -> 28;

@@ -19,6 +19,7 @@
 % API
 -export([start_link/2]).
 -export([get/0]).
+-export([get_single/0]).
 
 % Callbacks
 -export([init/1]).
@@ -30,7 +31,7 @@
 
 %--- Records -------------------------------------------------------------------
 
--record(state, {port, last_val}).
+-record(state, {port, last_val, txd_pin_state}).
 
 %--- API -----------------------------------------------------------------------
 
@@ -42,6 +43,10 @@ start_link(Slot, _Opts) ->
 -spec get() -> integer().
 get() ->
     gen_server:call(?MODULE, get_value).
+% @doc Get the latest measured distance in inches.
+-spec get_single() -> integer().
+get_single() ->
+    gen_server:call(?MODULE, get_single_value).
 
 %--- Callbacks -----------------------------------------------------------------
 
@@ -49,11 +54,23 @@ get() ->
 init(Slot = uart) ->
     Port = open_port({spawn_driver, "grisp_termios_drv"}, [binary]),
     grisp_devices:register(Slot, ?MODULE),
-    {ok, #state{port = Port}}.
+    grisp_gpio:configure(uart_2_txd, output_0),
+    {ok, #state{port = Port, txd_pin_state = output_0}}.
 
 % @private
 handle_call(get_value, _From, #state{last_val = Val} = State) ->
-    {reply, Val, State}.
+    {reply, Val, State};
+% @private
+handle_call(get_single_value, _From, State#state{txd_pin_state = Txd}) ->
+    Val = case Txd of
+        output_0 ->
+            grisp_gpio:configure(uart_2_txd, output_1),
+            erlang:send_after(100, ?MODULE, get_single_value);
+        output_1 ->
+            pmod_maxsonar:get(),
+            grisp_gpio:configure(uart_2_txd, output_0)
+    end,
+    {reply, Val, {noreply, State#state{txd_pin_state = output_0}, 5000}.
 
 % @private
 handle_cast(Request, _State) -> error({unknown_cast, Request}).
