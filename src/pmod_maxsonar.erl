@@ -64,21 +64,17 @@ init(Slot = uart) ->
 handle_call(get_value, _From, #state{last_val = Val} = State) ->
     {reply, Val, State};
 % @private
-handle_call(get_single_value, _From, #state{last_val = Val, txd_pin_state = Txd} = State) ->
-    Single = case Txd =:= output_0 of
+handle_call(get_single_value
+    , _From
+    , #state{last_val = LastVal, txd_pin_state = Txd} = State) ->
+
+    Single = case LastVal =:= undefined orelse Txd =:= output_0 of
         true -> %% first measurement
             grisp_gpio:configure(uart_2_txd, output_1),
-            timer:sleep(50),
+            timer:sleep(50), %% just in case, maybe not necessary
             pmod_maxsonar:get();
         _ ->
-            case Val =:= undefined of
-                true ->
-                    grisp_gpio:configure(uart_2_txd, output_1),
-                    timer:sleep(50),
-                    pmod_maxsonar:get();
-                false ->
-                    Val
-            end
+            LastVal
     end,
     grisp_gpio:configure(uart_2_txd, output_0),
     {reply
